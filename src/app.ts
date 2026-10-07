@@ -5,6 +5,8 @@ import sensible from '@fastify/sensible';
 import multipart from '@fastify/multipart';
 import { env } from './config/env.js';
 import { APP_CONSTANTS } from './config/index.js';
+import { requestIdPlugin } from './plugins/request-id.plugin.js';
+import { rateLimitPlugin } from './plugins/rate-limit.plugin.js';
 
 export interface AppOptions {
   logger?: boolean | object;
@@ -29,7 +31,13 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     disableRequestLogging: false,
   });
 
-  // 1. Security Headers via Helmet
+  // 1. Request Correlation ID
+  app.register(requestIdPlugin);
+
+  // 2. Rate Limiting
+  app.register(rateLimitPlugin);
+
+  // 3. Security Headers via Helmet
   app.register(helmet, {
     contentSecurityPolicy: {
       directives: {
@@ -42,7 +50,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     crossOriginEmbedderPolicy: false,
   });
 
-  // 2. Cross-Origin Resource Sharing
+  // 4. Cross-Origin Resource Sharing
   app.register(cors, {
     origin: true, // Allow all origins in dev/test, or configure per origin
     credentials: true,
@@ -50,10 +58,10 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-Id'],
   });
 
-  // 3. HTTP Utilities & Error Helpers
+  // 5. HTTP Utilities & Error Helpers
   app.register(sensible);
 
-  // 4. Multipart File Upload Support
+  // 6. Multipart File Upload Support
   app.register(multipart, {
     limits: {
       fieldNameSize: 100,
