@@ -1,0 +1,290 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  DONOR
+  NGO
+  VERIFIER
+  BENEFICIARY
+  VENDOR
+  ADMIN
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REMOVED
+}
+
+enum VendorCategory {
+  FOOD
+  HEALTH
+  SHELTER
+  EDUCATION
+  UTILITIES
+  EMERGENCY
+}
+
+model User {
+  id             String    @id @default(uuid())
+  stellarAddress String    @unique
+  role           UserRole
+  nonce          String    @default(uuid())
+  isVerified     Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  profile        Profile?
+  documents      Document[]
+  vendor         Vendor?
+  auditLogs      AuditLog[]
+
+  @@index([stellarAddress])
+  @@index([role])
+}
+
+model Profile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  legalNameEncrypted String
+  emailEncrypted     String?
+  phoneEncrypted     String?
+  organizationName   String?
+  country            String?
+  metadataEncrypted  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Document {
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  docType    String
+  s3Key      String
+  fileHash   String         // SHA-256 integrity hash
+  mimeType   String
+  sizeBytes  Int
+  status     DocumentStatus @default(PENDING)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([fileHash])
+}
+
+model Vendor {
+  id                String         @id @default(uuid())
+  stellarAddress    String         @unique
+  userId            String?        @unique
+  user              User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  businessName      String
+  category          VendorCategory
+  status            VendorStatus   @default(PENDING)
+  onChainRegistered Boolean        @default(false)
+  registeredTxHash  String?
+  registeredAt      DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([stellarAddress])
+  @@index([status])
+  @@index([category])
+}
+
+model Program {
+  id                String         @id @default(uuid())
+  onChainId         BigInt         @unique
+  creatorAddress    String
+  tokenContractId   String
+  title             String
+  description       String
+  category          VendorCategory
+  targetAmount      String         // Stored as string to preserve 128-bit uint precision
+  totalFunded       String         @default("0")
+  totalReleased     String         @default("0")
+  totalAllocated    String         @default("0")
+  totalRedeemed     String         @default("0")
+  totalReclaimed    String         @default("0")
+  requiredApprovals Int            @default(1)
+  isPaused          Boolean        @default(false)
+  isCancelled       Boolean        @default(false)
+  createdAtLedger   Int
+  createdAtTxHash   String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  milestones        Milestone[]
+  vouchers          Voucher[]
+  contributions     DonorContribution[]
+  payouts           VendorPayout[]
+
+  @@index([onChainId])
+  @@index([creatorAddress])
+}
+
+model Milestone {
+  id             String              @id @default(uuid())
+  programId      String
+  program        Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+  onChainIndex   Int
+  title          String
+  targetAmount   String
+  evidenceUri    String?
+  isApproved     Boolean             @default(false)
+  isReleased     Boolean             @default(false)
+  approvedLedger Int?
+  releasedLedger Int?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  approvals      MilestoneApproval[]
+
+  @@unique([programId, onChainIndex])
+  @@index([programId])
+}
+
+model MilestoneApproval {
+  id              String    @id @default(uuid())
+  milestoneId     String
+  milestone       Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  verifierAddress String
+  evidenceUri     String?
+  txHash          String
+  ledger          Int
+  createdAt       DateTime  @default(now())
+
+  @@unique([milestoneId, verifierAddress])
+  @@index([milestoneId])
+  @@index([verifierAddress])
+}
+
+model Voucher {
+  id                 String         @id @default(uuid())
+  onChainVoucherId   BigInt         @unique
+  programId          String
+  program            Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  beneficiaryAddress String
+  beneficiaryAnonId  String         // Pseudonymized identifier for public audit trail
+  vendorAddress      String?
+  category           VendorCategory
+  amount             String
+  isRedeemed         Boolean        @default(false)
+  isExpired          Boolean        @default(false)
+  isReclaimed        Boolean        @default(false)
+  expiresAt          DateTime
+  issuedLedger       Int
+  issuedTxHash       String
+  redeemedLedger     Int?
+  redeemedTxHash     String?
+  reclaimedLedger    Int?
+  reclaimedTxHash    String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([onChainVoucherId])
+  @@index([programId])
+  @@index([beneficiaryAddress])
+  @@index([beneficiaryAnonId])
+  @@index([isRedeemed])
+}
+
+model DonorContribution {
+  id           String   @id @default(uuid())
+  programId    String
+  program      Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  donorAddress String
+  amount       String
+  txHash       String
+  ledger       Int
+  createdAt    DateTime @default(now())
+
+  @@index([programId])
+  @@index([donorAddress])
+}
+
+model VendorPayout {
+  id               String   @id @default(uuid())
+  programId        String
+  program          Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  vendorAddress    String
+  voucherId        BigInt
+  amount           String
+  txHash           String
+  ledger           Int
+  createdAt        DateTime @default(now())
+
+  @@index([programId])
+  @@index([vendorAddress])
+}
+
+model ContractEvent {
+  id             String   @id @default(uuid())
+  eventId        String   @unique
+  contractId     String
+  topic          String
+  subTopic       String?
+  dataJson       String
+  ledger         Int
+  txHash         String
+  ledgerClosedAt DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([contractId])
+  @@index([topic])
+  @@index([ledger])
+}
+
+model IndexerCursor {
+  id         String   @id @default("default")
+  cursor     String?
+  lastLedger Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
+model WebhookSubscription {
+  id           String   @id @default(uuid())
+  ngoAddress   String
+  targetUrl    String
+  secret       String
+  active       Boolean  @default(true)
+  events       String[]
+  failureCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([ngoAddress])
+  @@index([active])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  action       String
+  actorAddress String?
+  actorId      String?
+  actor        User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  targetType   String
+  targetId     String
+  metadata     String?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([action])
+  @@index([actorAddress])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
