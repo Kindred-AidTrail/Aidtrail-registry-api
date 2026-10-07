@@ -8,6 +8,7 @@ import { APP_CONSTANTS } from './config/index.js';
 import { requestIdPlugin } from './plugins/request-id.plugin.js';
 import { rateLimitPlugin } from './plugins/rate-limit.plugin.js';
 import { swaggerPlugin } from './plugins/swagger.plugin.js';
+import { authRoutes } from './routes/auth.routes.js';
 
 export interface AppOptions {
   logger?: boolean | object;
@@ -76,7 +77,10 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     },
   });
 
-  // 5. Global Health Check
+  // 7. API Routes
+  app.register(authRoutes, { prefix: '/api/v1/auth' });
+
+  // 8. Global Health Check
   app.get('/health', async () => {
     return {
       status: 'healthy',
