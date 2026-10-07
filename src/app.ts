@@ -7,6 +7,7 @@ import { env } from './config/env.js';
 import { APP_CONSTANTS } from './config/index.js';
 import { requestIdPlugin } from './plugins/request-id.plugin.js';
 import { rateLimitPlugin } from './plugins/rate-limit.plugin.js';
+import { swaggerPlugin } from './plugins/swagger.plugin.js';
 
 export interface AppOptions {
   logger?: boolean | object;
@@ -43,7 +44,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'validator.swagger.io'],
       },
     },
@@ -57,6 +58,9 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-Id'],
   });
+
+  // 5. OpenAPI Swagger Documentation
+  app.register(swaggerPlugin);
 
   // 5. HTTP Utilities & Error Helpers
   app.register(sensible);
