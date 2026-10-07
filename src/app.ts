@@ -11,6 +11,7 @@ import { swaggerPlugin } from './plugins/swagger.plugin.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { beneficiaryRoutes } from './routes/beneficiary.routes.js';
 import { vendorRoutes } from './routes/vendor.routes.js';
+import { gdprRoutes } from './routes/gdpr.routes.js';
 
 export interface AppOptions {
   logger?: boolean | object;
@@ -83,6 +84,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   app.register(authRoutes, { prefix: '/api/v1/auth' });
   app.register(beneficiaryRoutes, { prefix: '/api/v1/beneficiaries' });
   app.register(vendorRoutes, { prefix: '/api/v1/vendors' });
+  app.register(gdprRoutes, { prefix: '/api/v1/gdpr' });
 
   // 8. Global Health Check
   app.get('/health', async () => {
