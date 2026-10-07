@@ -1,0 +1,32 @@
+# Node & Dependencies
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env.test
+
+# IDE & Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# MinIO & Local Data
+minio-data/
+postgres-data/
+
+# OS
+.DS_Store
+Thumbs.db
