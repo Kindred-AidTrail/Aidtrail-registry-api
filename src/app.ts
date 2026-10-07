@@ -12,6 +12,7 @@ import { authRoutes } from './routes/auth.routes.js';
 import { beneficiaryRoutes } from './routes/beneficiary.routes.js';
 import { vendorRoutes } from './routes/vendor.routes.js';
 import { gdprRoutes } from './routes/gdpr.routes.js';
+import { adminRoutes } from './routes/admin.routes.js';
 
 export interface AppOptions {
   logger?: boolean | object;
@@ -85,6 +86,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   app.register(beneficiaryRoutes, { prefix: '/api/v1/beneficiaries' });
   app.register(vendorRoutes, { prefix: '/api/v1/vendors' });
   app.register(gdprRoutes, { prefix: '/api/v1/gdpr' });
+  app.register(adminRoutes, { prefix: '/api/v1/admin' });
 
   // 8. Global Health Check
   app.get('/health', async () => {
