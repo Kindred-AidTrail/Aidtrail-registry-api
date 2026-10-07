@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma, serializeBigInt } from '../db/prisma.js';
+import { csvExportService } from '../services/csv-export.service.js';
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -430,5 +431,49 @@ export const auditRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       });
     }
   );
+
+  /**
+   * GET /api/v1/audit/export/csv
+   * Tamper-evident streaming CSV export of disbursements or milestone verification evidence
+   */
+  fastify.get(
+    '/export/csv',
+    {
+      schema: {
+        tags: ['Audit'],
+        summary: 'Stream CSV audit reports for disbursements or milestones',
+        querystring: {
+          type: 'object',
+          properties: {
+            type: {
+              type: 'string',
+              enum: ['disbursements', 'milestones'],
+              default: 'disbursements',
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { type } = request.query as { type?: string };
+      const reportType = type === 'milestones' ? 'milestones' : 'disbursements';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+      reply.header(
+        'Content-Disposition',
+        `attachment; filename="aidtrail-${reportType}-${timestamp}.csv"`
+      );
+      reply.type('text/csv');
+
+      if (reportType === 'milestones') {
+        const stream = await csvExportService.generateMilestonesCsv();
+        return reply.send(stream);
+      } else {
+        const stream = await csvExportService.generateDisbursementsCsv();
+        return reply.send(stream);
+      }
+    }
+  );
 };
+
 
