@@ -253,4 +253,182 @@ export const auditRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       });
     }
   );
+
+  /**
+   * GET /api/v1/audit/vouchers
+   * Pseudonymous public audit feed of vouchers (real addresses masked)
+   */
+  fastify.get(
+    '/vouchers',
+    {
+      schema: {
+        tags: ['Audit'],
+        summary: 'Public pseudonymous voucher transparency audit feed',
+        querystring: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer', default: 1 },
+            limit: { type: 'integer', default: 20 },
+            programId: { type: 'string' },
+            category: { type: 'string' },
+            isRedeemed: { type: 'boolean' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { page, limit, category } = paginationQuerySchema.parse(request.query);
+      const { programId, isRedeemed } = request.query as any;
+      const skip = (page - 1) * limit;
+
+      const where: any = {};
+      if (category) where.category = category.toUpperCase();
+      if (programId) {
+        where.program = /^\d+$/.test(programId)
+          ? { onChainId: BigInt(programId) }
+          : { id: programId };
+      }
+      if (typeof isRedeemed === 'boolean' || isRedeemed === 'true' || isRedeemed === 'false') {
+        where.isRedeemed = isRedeemed === true || isRedeemed === 'true';
+      }
+
+      const [total, vouchers] = await Promise.all([
+        prisma.voucher.count({ where }),
+        prisma.voucher.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            onChainVoucherId: true,
+            programId: true,
+            beneficiaryAnonId: true, // ONLY pseudonymous identifier exposed
+            category: true,
+            amount: true,
+            isRedeemed: true,
+            isExpired: true,
+            isReclaimed: true,
+            expiresAt: true,
+            issuedLedger: true,
+            issuedTxHash: true,
+            redeemedLedger: true,
+            redeemedTxHash: true,
+            createdAt: true,
+            program: {
+              select: {
+                onChainId: true,
+                title: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      return reply.send({
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        vouchers: serializeBigInt(vouchers),
+      });
+    }
+  );
+
+  /**
+   * GET /api/v1/audit/vendors/payouts
+   * Public list of on-chain payouts disbursed directly to verified vendors
+   */
+  fastify.get(
+    '/vendors/payouts',
+    {
+      schema: {
+        tags: ['Audit'],
+        summary: 'Public on-chain vendor payout disbursement history',
+        querystring: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer', default: 1 },
+            limit: { type: 'integer', default: 20 },
+            vendorAddress: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { page, limit } = paginationQuerySchema.parse(request.query);
+      const { vendorAddress } = request.query as any;
+      const skip = (page - 1) * limit;
+
+      const where: any = {};
+      if (vendorAddress) where.vendorAddress = vendorAddress;
+
+      const [total, payouts] = await Promise.all([
+        prisma.vendorPayout.count({ where }),
+        prisma.vendorPayout.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            program: {
+              select: {
+                onChainId: true,
+                title: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      const formatted = payouts.map((p) => ({
+        ...p,
+        stellarExpertTxUrl: `https://stellar.expert/explorer/testnet/tx/${p.txHash}`,
+      }));
+
+      return reply.send({
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        payouts: serializeBigInt(formatted),
+      });
+    }
+  );
+
+  /**
+   * GET /api/v1/audit/summary
+   * High-level platform transparency health metrics
+   */
+  fastify.get(
+    '/summary',
+    {
+      schema: {
+        tags: ['Audit'],
+        summary: 'Platform-wide humanitarian disbursement metrics',
+      },
+    },
+    async (_request, reply) => {
+      const [programsCount, vouchersCount, vendorsCount, contributions] = await Promise.all([
+        prisma.program.count(),
+        prisma.voucher.count(),
+        prisma.vendor.count({ where: { onChainRegistered: true } }),
+        prisma.donorContribution.findMany({ select: { amount: true } }),
+      ]);
+
+      const totalCapitalFunded = contributions.reduce(
+        (acc, c) => acc + BigInt(c.amount),
+        BigInt(0)
+      );
+
+      return reply.send({
+        totalPrograms: programsCount,
+        totalVouchersIssued: vouchersCount,
+        totalWhitelistedVendors: vendorsCount,
+        totalCapitalFundedStroops: totalCapitalFunded.toString(),
+        network: 'Stellar Testnet',
+        contractId: fastify.initialConfig || 'AidTrail Soroban Contract',
+      });
+    }
+  );
 };
+
