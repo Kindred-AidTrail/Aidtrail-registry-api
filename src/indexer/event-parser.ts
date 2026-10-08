@@ -21,6 +21,7 @@ export type EventTopicKind =
   | 'milestn:added'
   | 'milestn:apprvd'
   | 'milestn:release'
+  | 'milestn:ver_upd'
   | 'vendor:reg'
   | 'vendor:rem'
   | 'voucher:issued'
@@ -161,6 +162,18 @@ export class EventParser {
               programId: BigInt(rawData[0]),
               milestoneIndex: Number(rawData[1]),
               amount: BigInt(rawData[2]),
+            };
+          }
+          break;
+        }
+
+        case 'milestn:ver_upd': {
+          // (program_id: u64, milestone_id: u32, required_approvals: u32)
+          if (Array.isArray(rawData) && rawData.length >= 3) {
+            typedData = {
+              programId: BigInt(rawData[0]),
+              milestoneIndex: Number(rawData[1]),
+              requiredApprovals: Number(rawData[2]),
             };
           }
           break;

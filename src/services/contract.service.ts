@@ -76,12 +76,23 @@ export class ContractService {
         account = new Account(serverAddress, '100');
       }
 
-      // Convert category to Soroban Symbol ScVal
-      const categorySymbol = xdr.ScVal.scvSymbol(categoryName.toUpperCase());
+      // Convert arguments matching Soroban contract signature:
+      // register_vendor(caller, vendor_address, allowed_categories: Vec<Symbol>, metadata_uri: String)
+      const callerScVal = new Address(serverAddress).toScVal();
       const vendorScVal = new Address(vendorAddress).toScVal();
+      const categoriesVecScVal = xdr.ScVal.scvVec([
+        xdr.ScVal.scvSymbol(categoryName.toUpperCase()),
+      ]);
+      const metadataScVal = xdr.ScVal.scvString(`aidtrail://vendors/${vendorAddress}`);
 
       // Build contract call operation
-      const callOp = contract.call('register_vendor', vendorScVal, categorySymbol);
+      const callOp = contract.call(
+        'register_vendor',
+        callerScVal,
+        vendorScVal,
+        categoriesVecScVal,
+        metadataScVal
+      );
 
       const txBuilder = new TransactionBuilder(account, {
         fee: '10000',

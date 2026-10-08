@@ -177,6 +177,9 @@ export class IndexerWorker {
       case 'milestn:release':
         await programEventHandler.handleMilestoneReleased(event);
         break;
+      case 'milestn:ver_upd':
+        await programEventHandler.handleMilestoneVerifiersUpdated(event);
+        break;
       case 'vendor:reg':
         await voucherEventHandler.handleVendorRegistered(event);
         break;

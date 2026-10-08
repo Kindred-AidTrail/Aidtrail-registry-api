@@ -150,14 +150,18 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         });
       }
 
-      // Retrieve or update user
+      // Retrieve or update user and rotate nonce to prevent replay
       const user = await prisma.user.upsert({
         where: { stellarAddress: account },
-        update: { isVerified: true },
+        update: {
+          isVerified: true,
+          nonce: crypto.randomUUID(),
+        },
         create: {
           stellarAddress: account,
           role: UserRole.DONOR,
           isVerified: true,
+          nonce: crypto.randomUUID(),
         },
       });
 

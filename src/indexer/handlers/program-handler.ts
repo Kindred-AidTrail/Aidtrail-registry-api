@@ -139,6 +139,23 @@ export class ProgramEventHandler {
   }
 
   /**
+   * Handles ("milestn", "ver_upd") event
+   */
+  public async handleMilestoneVerifiersUpdated(event: ParsedEvent): Promise<void> {
+    const { programId, requiredApprovals } = event.data;
+    const program = await prisma.program.findUnique({
+      where: { onChainId: programId },
+    });
+
+    if (program) {
+      await prisma.program.update({
+        where: { id: program.id },
+        data: { requiredApprovals },
+      });
+    }
+  }
+
+  /**
    * Handles ("milestn", "apprvd") event
    */
   public async handleMilestoneApproved(event: ParsedEvent): Promise<void> {
